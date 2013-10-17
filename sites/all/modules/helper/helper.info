@@ -1,0 +1,6 @@
+; $Id$
+name = "Helper Sistema Movimiento Peregrino"
+description = "Contiene la biblioteca de funciones y procedimientos adicionales a los modulos disponibles para drupal"
+version = "6.x"
+core = "6.x"
+package = "Otros"

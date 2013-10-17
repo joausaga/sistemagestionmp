@@ -1,0 +1,12 @@
+; $Id: logins.info,v 1.0 2010/09/14 15:38:18 mmarais Exp $
+name = User Access
+description = Module for logging user node views
+package = Statistics
+core = "6.x"
+
+; Information added by drupal.org packaging script on 2010-10-07
+version = "6.x-1.0"
+core = "6.x"
+project = "user_access"
+datestamp = "1286457665"
+

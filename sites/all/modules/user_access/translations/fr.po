@@ -1,0 +1,72 @@
+# $Id$
+#
+# French translation of Drupal (general)
+# Copyright YEAR NAME <EMAIL@ADDRESS>
+# Generated from files:
+#  logins.info,v 1.0 2010/09/14 15:38:18 mmarais
+#  views/user_access.views.inc: n/a
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"POT-Creation-Date: 2010-09-24 13:03+0200\n"
+"PO-Revision-Date: 2010-09-24 13:08+0100\n"
+"Last-Translator: Maxime MARAIS <maxime.marais@gmail.com>\n"
+"Language-Team: French Team <http://localize.drupal.org/translate/languages/fr>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n!=1);\n"
+
+#: user_access.info:0
+msgid "User Access"
+msgstr "User Access"
+
+#: user_access.info:0
+msgid "Module for logging user node access"
+msgstr "Module pour suivre les accès aux noeuds par les utilsateurs"
+
+#: views/user_access.views.inc:27
+msgid "Users node views statistics"
+msgstr "Statistiques de visualisation des noeuds par les utilisateurs"
+
+#: views/user_access.views.inc:32
+msgid "Node views"
+msgstr "Visualisations des noeuds"
+
+#: views/user_access.views.inc:33
+msgid "Node views statistics"
+msgstr "Statistiques de visualisations des noeuds"
+
+#: views/user_access.views.inc:55
+msgid "User's node view ID"
+msgstr "ID de la visualisation du noeud par l'utilisateur"
+
+#: views/user_access.views.inc:56
+msgid "User's node view ID. Considere using this field with 'Views Group By' module"
+msgstr "ID de la visualisation du noeud par l'utilisateur. Envisagez l'utilisation de ce champ avec le module \"Views Group By\""
+
+#: views/user_access.views.inc:76;83
+msgid "Node"
+msgstr "Nœud"
+
+#: views/user_access.views.inc:77
+msgid "Viewed node ID"
+msgstr "ID du noeud vu"
+
+#: views/user_access.views.inc:90;97
+msgid "User"
+msgstr "Utilisateur"
+
+#: views/user_access.views.inc:91
+msgid "Viewer's user ID"
+msgstr "ID utilisateur du visualisateur"
+
+#: views/user_access.views.inc:105
+msgid "View time"
+msgstr "Date de visualisation"
+
+#: views/user_access.views.inc:106
+msgid "Date and time the node was viewed"
+msgstr "Date et heure à laquelle le noeud a été visualisé"
+

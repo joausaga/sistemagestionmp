@@ -1,0 +1,12 @@
+name = "Mail Queue"
+description = "All mail is queued, and then batch proccessed."
+package = Mail
+core = 6.x
+
+
+; Information added by drupal.org packaging script on 2011-04-29
+version = "6.x-1.0"
+core = "6.x"
+project = "mailq"
+datestamp = "1304116316"
+

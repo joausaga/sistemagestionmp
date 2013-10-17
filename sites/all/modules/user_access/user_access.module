@@ -1,0 +1,43 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ * This module enable Drupal to follow users' node views
+ * and to give back usage statistic thrue Views
+ */
+
+/**
+ * Implementation of hook_exit().
+ *
+ * This hook is called each time a page is called. We take advantage of
+ * this mecanism to record user action
+ */
+function user_access_exit() {
+  // At this point a global variable $user is set, usefull to get current uid.
+  global $user;
+  
+  // Our scope is to count only node views.
+  if ((arg(0) == 'node') && is_numeric(arg(1)) && arg(2) == '') {
+    // A node has been viewed, let's save this information.
+    db_query(
+      'INSERT INTO {node_user_access} (nid, uid, timestamp) VALUES (%d, %d, %d)', 
+      array(
+        arg(1), 
+        $user->uid, time()
+      )
+    );
+  }
+}
+
+/**
+ * Implementation of hook_views_api().
+ * 
+ * This allows use to expose node access in Views' forms.
+ */
+function user_access_views_api() {
+  return array(
+    'api' => 2,
+    'path' => drupal_get_path('module', 'user_access') .'/views',
+  );
+}

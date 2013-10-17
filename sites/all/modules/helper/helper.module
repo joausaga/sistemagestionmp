@@ -1,0 +1,902 @@
+<?php
+
+module_load_include('inc', 'node_import', 'node_import.admin');
+
+// $Id$
+/**
+* @file
+* Modulo para validar la introducción del número de teléfono celular al momento de crear una persona
+*/
+ 
+/*
+* Implementacion del hook_form_alter()
+*
+*/
+function helper_form_alter(&$form, $form_state, $form_id) {
+    if ($form_id == 'person_node_form') {
+        $form['#validate'] = array('_validacion_nueva_persona');
+    }
+    if ($form_id == 'sms_node_form') {
+        //print_r($form);
+        $form['buttons']['submit']['#submit'][0] = 'helper_sms_node_form_submit';
+    }
+    if ($form_id == 'group_node_form') {
+        //print_r($form);
+        $form['buttons']['submit']['#submit'][0] = 'helper_group_node_form_submit';
+    }
+    if ($form_id == 'person_categories_node_form') {
+        //print_r($form);
+        $form['buttons']['submit']['#submit'][0] = 'helper_person_categories_node_form_submit';
+    }
+    if ($form_id == 'retreat_node_form') {
+        //print_r($form);
+        $form['buttons']['submit']['#submit'][0] = 'helper_retreat_node_form_submit';
+    }
+    return $form;
+}
+
+function helper_nodeapi(&$node, $op, $teaser = NULL, $page = NULL) {
+    switch($op) {
+        case('delete'):
+            if($node->type == "group")
+                if ($node->field_grupo_es_destinatario[0]['value'] == "si")
+                    _borrar_de_tabla_destinatarios($node->nid,"group");
+            if($node->type == "person")
+                //Borrar el historial de la persona 
+                _borrar_historial_persona($node->nid);
+            if($node->type == "person_categories")
+                _borrar_de_tabla_destinatarios($node->nid,"person_categories");
+            break;
+        case('insert'):
+            if($node->type == "person")
+                _cargar_edad_persona($node->nid, $node->field_fecha_nacimiento_persona[0]['value']);
+            if ($node->type == "boletin_noticias") {       
+                $news_url = _crear_boletin($node);
+                $message = "Para visualizar su nuevo boletin haga clic ";
+                $message .= "<a href=\"".$news_url."\"target=\"_blank\" />AQUI</a>";
+                drupal_set_message($message);
+            }
+            if ($node->type == "masive_action")
+                _do_masive_action($node);
+            break;
+        case('update');
+            if ($node->type == "boletin_noticias") {
+                $news_url = _crear_boletin($node);
+                $message = "Para visualizar su boletin haga clic ";
+                $message .= "<a href=\"".$news_url."\"target=\"_blank\" />AQUI</a>";
+                drupal_set_message($message);
+            }
+            if ($node->type == "masive_action")
+                _do_masive_action($node);
+            break;
+    }
+}
+
+function _do_masive_action($node) {
+    $term_action = taxonomy_get_term($node->field_accion[1]['value'])->description;
+    $term_value = taxonomy_get_term($node->field_accion[0]['value'])->description;
+    $people = $node->field_personas_accion;
+    switch($term_action) {
+        case('convertir_categoria'):
+            foreach($people as $person) {
+                 $query='update content_type_person set field_categoria_persona_nid = \''. $term_value .
+                        '\' where nid = ' . $person['nid'];
+                 $result = db_query($query);
+            }
+            break;
+        case('convertir_estado_civil'):
+            foreach($people as $person) {
+                 $query='update content_type_person set field_estado_civil_persona_value = \''. $term_value .
+                        '\' where nid = ' . $person['nid'];
+                 $result = db_query($query);
+            }
+            break;
+        case('convertir_estudio_profesion'):
+            foreach($people as $person) {
+                 $query='update content_type_person set field_estudio_profesion_persona_value = \''. $term_value .
+                        '\' where nid = ' . $person['nid'];
+                 $result = db_query($query);
+            }
+            break;
+    }
+}
+
+function _crear_boletin($node) {
+    $year = $node->field_ano_boletin[0]['value'];
+    $number = $node->field_nro_boletin[0]['value'];
+    $file_name = "sites/default/files/boletines/boletin_". $year . "-" . $number . ".html";
+    $news_dir = "/home2/movimien/public_html/boletin_prensa/boletines/boletin_". $year . "-" . $number . ".html";
+    $news_url = "http://movimientoperegrino.org/boletin_prensa/boletines/boletin_". $year . "-" . $number . ".html";
+    $f = fopen($file_name, "w") or die("can't open file: ".$file_name);
+    $news = _get_news_string($node,$file_name,$news_url);
+    fwrite($f, $news);
+    fclose($f);
+    copy($file_name, $news_dir);
+    return $news_url;
+}
+
+function _get_news_string($node,$file_name,$news_url) {
+    $root_url = "http://movimientoperegrino.org/sg/";
+    $news = "";
+    $news = $news . "<html>\n";
+    $news = $news . "<head>\n";
+    $news = $news . "<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\">\n";
+    $news = $news . "<title>Bolentin de Noticias - Movimiento Peregrino</title>\n";
+    $news = $news ."<link href=\"http://www.movimientoperegrino.org/boletin_prensa/boletin.css\" rel=\"stylesheet\" type=\"text/css\">\n";
+    $news .= "</head>\n";
+    $news .= "<body>\n";
+    $news .= "<table width=\"100%\" cellspacing=\"10\" cellpadding=\"0\" align=\"center\">\n";
+    $news .= "<tr>\n";
+    $news .= "<td align=\"center\" valign=\"top\">\n";
+    $news .= "<table width=\"600\" border=\"0\" cellspacing=\"0\" cellpadding=\"0\" class=\"main\" align=\"center\">\n";
+    $news .= "<tr>\n";
+    $news .= "<td align=\"center\" class=\"permission\">\n";
+    $news .= "<p>Ha recibido este boletín porque acepto recibir noticias del Movimiento Peregrino.</p>\n";
+    $news .= "<p>¿No está más interesado en recibirlo? <a href=\"mailto:prensa@movimientoperegrino.org?subject=REMOVER\">Darse de Baja</a>. ¿Problemas para ver el boletin?. <a href=\"".$news_url."\">Ver en el navegador.</a></p>\n";
+    $news .= "</td>\n";
+    $news .= "</tr>\n";
+    $news .= "<tr>\n";
+    $news .= "<td height=\"90\" valign=\"bottom\" align=\"left\" class=\"header\">\n";
+    $news .= "<img src=\"http://www.movimientoperegrino.org/boletin_prensa/imagenes/encabezado.png\" width=\"600\" height=\"274\" alt=\"Boletin Movimiento Peregrino\" />\n";
+    $news .= "</td>\n";
+    $news .= "</tr>\n";
+    $news .= "<tr>\n";
+    $news .= "<td align=\"center\">\n";
+    $news .= "<table width=\"600\" cellspacing=\"0\" cellpadding=\"0\">\n";
+    $news .= "<tr>\n";
+    $news .= "<td width=\"200\" class=\"date\"></td>\n";
+    $news .= "<td> </td>\n";
+    $news .= "<td class=\"date\"><p>Año ". $node->field_ano_boletin[0]['value'] . " - N° ". $node->field_nro_boletin[0]['value'] . "</p></td>\n";
+    $news .= "</tr>\n";
+    $news .= "<tr align=\"left\" rowspan= \"3\" valign=\"top\">\n";
+    $news .= "<td width=\"200\" valign=\"top\" class=\"sidebar\" align=\"left\">\n";
+    $news .= "<table width=\"100%\" cellspacing=\"0\" cellpadding=\"4\" bgcolor=\"#eeeeee\">\n";
+    $news .= "<tr>\n";
+    $news .= "<td bgcolor=\"#000000\" class=\"sideHeader\">\n";
+    $news .= "<h3>En este boletin</h3>\n";
+    $news .= "</td>\n";
+    $news .= "</tr>\n";
+    $news .= "<tr>\n";
+    $news .= "<td>\n";
+    $news .= "<ul>\n";
+    $news .= "<li><a href=\"#noticia_1\">". $node->field_titulo_noticia1_boletin[0]['value'] . "</a></li>\n";
+    if ($node->field_titulo_noticia2_boletin[0]['value'] != NULL)
+        $news .= "<li><a href=\"#noticia_2\">". $node->field_titulo_noticia2_boletin[0]['value'] . "</a></li>\n";
+    if ($node->field_titulo_noticia3_boletin[0]['value'] != NULL)
+        $news .= "<li><a href=\"#noticia_3\">". $node->field_titulo_noticia3_boletin[0]['value'] . "</a></li>\n";
+    if ($node->field_titulo_noticia4_boletin[0]['value'] != NULL)
+        $news .= "<li><a href=\"#noticia_4\">". $node->field_titulo_noticia4_boletin[0]['value'] . "</a></li>\n";
+    $news .= "</ul>\n";
+    $news .= "</td>\n";
+    $news .= "</tr>\n";
+    $news .= "</table>\n";                           
+    $news .= "<img src=\"http://www.movimientoperegrino.org/boletin_prensa/imagenes/smallspacer.gif\" width=\"192\" height=\"25\" />\n";     
+    if (count($node->field_blogs_boletin) > 0) {                      
+        $news .= "<table width=\"100%\" cellspacing=\"0\" cellpadding=\"4\">\n";
+        $news .= "<tr>\n";
+        $news .= "<td bgcolor=\"#000000\" class=\"sideHeader\">\n";
+        $news .= "<h3>Visita los blogs!</h3>\n";
+        $news .= "</td>\n";
+        $news .= "</tr>\n";
+        $news .= "<tr>\n";
+        $news .= "<td>\n";
+        $news .= "<ul>\n";
+        foreach ((array)$node->field_blogs_boletin as $item)
+            if ($item['url'] != '')
+                $news .= "<li><a href=\"".$item['url']."\">".$item['title']."</a></li>\n";
+        $news .= "</ul>\n";
+        $news .= "</td>\n";
+        $news .= "</tr>\n";
+        $news .= "</table>\n";                           
+        $news .= "<img src=\"http://www.movimientoperegrino.org/boletin_prensa/imagenes/smallhr.gif\" width=\"190\" height=\"19\" />\n";
+        $news .= "<img src=\"http://www.movimientoperegrino.org/boletin_prensa/imagenes/smallspacer.gif\" width=\"192\" height=\"25\" />\n";
+    }
+    if ($node->field_titulo_noticia_br1_boletin[0]['value'] != NULL or $node->field_titulo_noticia_br2_boletin[0]['value'] != NULL) {
+        $news .= "<table width=\"100%\" cellspacing=\"0\" cellpadding=\"4\" bgcolor=\"#000000\">\n";
+        $news .= "<tr>\n";
+        $news .= "<td class=\"sideTitle\">\n";
+        $news .= "<h3>Otras Noticias</h3>\n";
+        $news .= "</td>\n";
+        $news .= "</tr>\n";
+        $news .= "</table>\n";
+        if ($node->field_titulo_noticia_br1_boletin[0]['value'] != NULL) {
+            $news .= "<h4>".$node->field_titulo_noticia_br1_boletin[0]['value']."</h4>\n";
+            $news .= "<p>".$node->field_cuerpo_noticia_br1_boletin[0]['value']."<br><a href=\"".$node->field_link_noticia_br1_boletin[0]['url']."\">Leer más</a></p>\n";									
+            $news .= "<img src=\"http://www.movimientoperegrino.org/boletin_prensa/imagenes/smallhr.gif\" width=\"190\" height=\"19\" />\n";
+        }
+        if ($node->field_titulo_noticia_br2_boletin[0]['value'] != NULL) {
+            $news .= "<h4>".$node->field_titulo_noticia_br2_boletin[0]['value']."</h4>\n";
+            $news .= "<p>".$node->field_cuerpo_noticia_br2_boletin[0]['value']."<br><a href=\"".$node->field_link_noticia_br2_boletin[0]['url']."\">Leer más</a></p>\n";
+            $news .= "<img src=\"http://www.movimientoperegrino.org/boletin_prensa/imagenes/smallhr.gif\" width=\"190\" height=\"19\" />\n";
+        }                             
+        $news .= "<img src=\"http://www.movimientoperegrino.org/boletin_prensa/imagenes/smallspacer.gif\" width=\"192\" height=\"25\" />\n";
+    }
+    $news .= "<table width=\"100%\" cellspacing=\"0\" cellpadding=\"4\" bgcolor=\"#000000\">\n";
+    $news .= "<tr>\n";
+    $news .= "<td class=\"sideTitle\">\n";
+    $news .= "<h3>Pedido de Oraciones</h3>\n";
+    $news .= "</td>\n";
+    $news .= "</tr>\n";
+    $news .= "</table>\n";
+    $news .= "<p>El Movimiento Peregrino cuenta con una comunidad \"virtual\" de oración quiénes se comprometieron a rezar por las intenciones que le soliciten. Si necesita pedir por alguna intención podés hacerlo <a href=\"http://www.movimientoperegrino.org/sw/contenido/formulario-de-solicitud-de-oracion\">aquí</a>.</p>\n"; 
+    $news .= "<p>Si querés formar parte de la comunidad de oración, puedes suscribirte <a href=\"http://www.movimientoperegrino.org/sw/user_mailman_register\">aquí</a></p>\n";
+    $news .= "<img src=\"http://www.movimientoperegrino.org/boletin_prensa/imagenes/smallhr.gif\" width=\"190\" height=\"19\" />\n";
+    $news .= "<img src=\"http://www.movimientoperegrino.org/boletin_prensa/imagenes/smallspacer.gif\" width=\"192\" height=\"25\" />\n";
+    if ($node->field_calendario_mes_boletin[0] != NULL) {						
+        $news .= "<table width=\"100%\" cellspacing=\"0\" cellpadding=\"4\" bgcolor=\"#000000\">\n";
+        $news .= "<tr>\n";
+        $news .= "<td class=\"sideTitle\">\n";
+        $news .= "<h3>Calendario del Mes</h3>\n";
+        $news .= "</td>\n";
+        $news .= "</tr>\n";
+        $news .= "</table>\n";
+        $news .= "<p><a href=\"http://www.movimientoperegrino.org/sw/contenido/actividades\" target=\"_blank\"/><img src=\"$root_url".$node->field_calendario_mes_boletin[0]['filepath']."\" /></a></p>\n";
+        $news .= "<p>Click en el calendario para verlo en un mayor tamaño.</p>\n";
+        $news .= "<img src=\"http://www.movimientoperegrino.org/boletin_prensa/imagenes/smallhr.gif\" width=\"190\" height=\"19\" />\n";
+        $news .= "<img src=\"http://www.movimientoperegrino.org/boletin_prensa/imagenes/smallspacer.gif\" width=\"192\" height=\"25\" />\n";
+    }
+    $news .= "</td>\n";
+    $news .= "<td width=\"28\"></td>\n";
+    $news .= "<td width=\"400\" valign=\"top\" class=\"mainbar\" align=\"left\">\n";
+    $news .= "<table cellspacing=\"0\" cellpadding=\"4\" bgcolor=\"#000000\">\n";
+    $news .= "<tr>\n";
+    $news .= "<td>\n";
+    $news .= "<h2><a name=\"noticia_1\">".$node->field_titulo_noticia1_boletin[0]['value']."</a></h2>\n";
+    $news .= "</td>\n";
+    $news .= "</tr>\n";
+    $news .= "</table>\n";
+    if ($node->field_imagen_noticia1_boletin[0] != NULL) {
+        $news .= "<p><img src=\"$root_url".$node->field_imagen_noticia1_boletin[0]['filepath']."\" /></p>\n";
+    }
+    $news .= "<p>".$node->field_cuerpo_noticia1_boletin[0]['value']."</p>\n";
+    $news .= "<p class=\"more\"><a href=\"".$node->field_link_noticia1_boletin[0]['url']."\">Leer más</a></p>\n";
+    $news .= "<img src=\"http://www.movimientoperegrino.org/boletin_prensa/imagenes/hr.gif\" width=\"329\" height=\"27\" />\n";
+    if ($node->field_titulo_noticia2_boletin[0]['value'] != NULL) {
+        $news .= "<table cellspacing=\"0\" cellpadding=\"4\" bgcolor=\"#000000\">\n";
+        $news .= "<tr>\n";
+        $news .= "<td>\n";
+        $news .= "<h2><a name=\"noticia_2\">".$node->field_titulo_noticia2_boletin[0]['value']."</a></h2>\n";
+        $news .= "</td>\n";
+        $news .= "</tr>\n";
+        $news .= "</table>\n";
+        if ($node->field_imagen_noticia2_boletin[0] != "") {
+            $news .= "<p><img src=\"$root_url".$node->field_imagen_noticia2_boletin[0]['filepath']."\" /></p>\n";
+        }
+        $news .= "<p>".$node->field_cuerpo_noticia2_boletin[0]['value']."</p>\n";
+        $news .= "<p class=\"more\"><a href=\"".$node->field_link_noticia2_boletin[0]['url']."\">Leer más</a></p>\n";
+        $news .= "<img src=\"http://www.movimientoperegrino.org/boletin_prensa/imagenes/hr.gif\" width=\"329\" height=\"27\" />\n";
+    }
+    if ($node->field_titulo_noticia3_boletin[0]['value'] != NULL) {
+        $news .= "<table cellspacing=\"0\" cellpadding=\"4\" bgcolor=\"#000000\">\n";
+        $news .= "<tr>\n";
+        $news .= "<td>\n";
+        $news .= "<h2><a name=\"noticia_3\">".$node->field_titulo_noticia3_boletin[0]['value']."</a></h2>\n";
+        $news .= "</td>\n";
+        $news .= "</tr>\n";
+        $news .= "</table>\n";
+        if ($node->field_imagen_noticia3_boletin[0] != "") {
+            $news .= "<p><img src=\"$root_url".$node->field_imagen_noticia3_boletin[0]['filepath']."\" /></p>\n";
+        }
+        $news .= "<p>".$node->field_cuerpo_noticia3_boletin[0]['value']."</p>\n";
+        $news .= "<p class=\"more\"><a href=\"".$node->field_link_noticia3_boletin[0]['url']."\">Leer más</a></p>\n";
+        $news .= "<img src=\"http://www.movimientoperegrino.org/boletin_prensa/imagenes/hr.gif\" width=\"329\" height=\"27\" />\n";
+    }
+    if ($node->field_titulo_noticia4_boletin[0]['value'] != NULL) {
+        $news .= "<table cellspacing=\"0\" cellpadding=\"4\" bgcolor=\"#000000\">\n";
+        $news .= "<tr>\n";
+        $news .= "<td>\n";
+        $news .= "<h2><a name=\"noticia_4\">".$node->field_titulo_noticia4_boletin[0]['value']."</a></h2>\n";
+        $news .= "</td>\n";
+        $news .= "</tr>\n";
+        $news .= "</table>\n";
+        if ($node->field_imagen_noticia4_boletin[0] != "") {
+            $news .= "<p><img src=\"$root_url".$node->field_imagen_noticia4_boletin[0]['filepath']."\" /></p>\n";
+        }
+        $news .= "<p>".$node->field_cuerpo_noticia4_boletin[0]['value']."</p>\n";
+        $news .= "<p class=\"more\"><a href=\"".$node->field_link_noticia4_boletin[0]['url']."\">Leer más</a></p>\n";
+        $news .= "<img src=\"http://www.movimientoperegrino.org/boletin_prensa/imagenes/hr.gif\" width=\"329\" height=\"27\" />\n";
+    }
+    $news .= "</td>\n";
+    $news .= "</tr>\n";
+    $news .= "</table>\n";                  
+    $news .= "</td>\n";
+    $news .= "</tr>\n";
+    $news .= "<tr>\n";
+    $news .= "<td align=\"center\" class=\"footer\">\n";
+    $news .= "<p>Seguinos en<a target=\"_blank\" href=\"http://www.youtube.com/movimientoperegrino\"><img align=\"middle\" src=\"http://www.movimientoperegrino.org/boletin_prensa/imagenes/youtube.png\"/></a><a target=\"_blank\" href=\"http://www.facebook.com/pages/Movimiento-Peregrino/202469294091\"><img align=\"middle\" src=\"http://www.movimientoperegrino.org/boletin_prensa/imagenes/facebook.png\"/></a><a target=\"_blank\" href=\"http://www.twitter.com/movperegrino\"><img align=\"middle\" src=\"http://www.movimientoperegrino.org/boletin_prensa/imagenes/twitter.png\"/></a></p>\n";
+    $news .= "<p>Para dejar de recibir este boletín, favor enviar un email a prensa@movimientoperegrino.org, con el sujeto: REMOVER.</p>\n";
+    $news .= "<p><span style=\"font-weight: bold;\">Movimiento Peregrino (www.movimientoperegrino.org)</span></p>\n";
+    $news .= "<p>Guido Spano 1369 casi Senador Long &#151; Asunción, Paraguay</p>\n";
+    $news .= "</td>\n";
+    $news .= "</tr>\n";
+    $news .= "</table>\n";
+    $news .= "</td>\n";
+    $news .= "</tr>\n";
+    $news .= "</table>\n";
+    $news .= "</body>\n";
+    $news .= "</html>\n";
+    return $news;
+}
+
+function _cargar_edad_persona($nodeid, $fecha_nacimiento) {
+    list($year,$month,$day) = explode("-", $fecha_nacimiento);
+    $year_diff  = date("Y") - $year;
+    $month_diff = date("m") - $month;
+    $day_diff   = date("d") - $day;
+    if ($day_diff < 0 || $month_diff < 0)
+        $year_diff--;
+    $query='update content_type_person set field_edad_persona_value = ' . $year_diff . ' where nid = ' . $nodeid;
+    db_query($query);
+}
+
+/*
+* Validacion del formulario de creación de personas.
+* La validacion consiste en verificar si el formato introducido es de la forma 09XX-XXXXXX
+*/
+function _validacion_nueva_persona($form, &$form_state) {   
+    if ($form_state['values']['field_recibir_avisos_persona'][0]['value'] == 1) {
+        if ($form_state['values']['field_celular_persona'][0]['value'] != NULL) {
+            if (!(eregi('^09[0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9]$', $form_state['values']['field_celular_persona'][0]['value']))) {
+                form_set_error('field_celular_persona', t('N° de Teléfono Celular inválido, ingrese utilizando el formato requerido.'));                
+            }
+        }    
+        else {
+            form_set_error('field_celular_persona', t('N° de Teléfono Celular necesario si la persona va a recibir avisos.'));
+        }
+    }
+}
+
+function helper_person_categories_node_form_submit($form, &$form_state) {
+    global $user;
+
+    $node = node_form_submit_build_node($form, $form_state);
+    $insert = empty($node->nid);
+    node_save($node);
+    $node_link = l(t('value'), 'node/'. $node->nid);
+    $watchdog_args = array('@type' => $node->type, '%title' => $node->title);
+    $t_args = array('@type' => node_get_types('name', $node), '%title' => $node->title);
+
+    $node_id = $node->nid;
+    $nombre_categoria = $form_state['values']['field_nombre_categoria_persona']['0']['value'];
+    if ($insert) {
+        watchdog('content', '@type: added %title.', $watchdog_args, WATCHDOG_NOTICE, $node_link);
+        drupal_set_message(t('@type %title has benn created.', $t_args));
+        _cargar_a_tabla_destinatarios($node_id,_pluralizar_categoria_persona($nombre_categoria),"person_categories");
+    }
+    else {
+        watchdog('content', '@type: updated %title.', $watchdog_args, WATCHDOG_NOTICE, $node_link);
+        drupal_set_message(t('@type %title has been updated.', $t_args));        
+        _actualizar_tabla_destinatarios($node_id,_pluralizar_categoria_persona($nombre_categoria));
+    }
+    if ($node->nid) {
+        unset($form_state['rebuild']);
+        $form_state['nid'] = $node->nid;
+        $form_state['redirect'] = 'node/'. $node->nid;
+    }
+    else {
+        // In the unlikely case something went wrong on save, the node will be
+        // rebuilt and node form redisplayed the same way as in prevalue.
+        drupal_set_message(t('The post could not be saved.'), 'error');
+    }
+}
+
+function _pluralizar_categoria_persona($categoria_persona) {
+    $vocales = array("a","á","e","é","i","o","ó","u");
+    $consonantes_especiales = array("s","x");
+
+    $lon_nombre_cat = strlen($categoria_persona);
+    $ultima_letra = $categoria_persona[$lon_nombre_cat-1];
+    if (in_array($ultima_letra,$consonantes_especiales))
+        $nombre_pluralizado = $categoria_persona;
+    else
+        if (in_array($ultima_letra,$vocales))
+            $nombre_pluralizado = $categoria_persona . "s";
+        else
+            $nombre_pluralizado = $categoria_persona . "es";
+
+    return $nombre_pluralizado;
+}
+
+function helper_group_node_form_submit($form, &$form_state) {
+    global $user;
+
+    $node = node_form_submit_build_node($form, $form_state);
+    $insert = empty($node->nid);
+    node_save($node);
+    $node_link = l(t('value'), 'node/'. $node->nid);
+    $watchdog_args = array('@type' => $node->type, '%title' => $node->title);
+    $t_args = array('@type' => node_get_types('name', $node), '%title' => $node->title);
+
+    $node_id = $node->nid;
+    $nombre_grupo = $form_state['values']['field_nombre_grupo']['0']['value'];
+    $tipo_grupo = $form_state['values']['field_tipo_grupo']['0']['nid'];
+    $miembros_grupo = $form_state['values']['field_miembros_grupo'];
+    $grupo_destinatario = $form_state['values']['field_grupo_es_destinatario']['0']['value'];
+    if ($insert) {
+        watchdog('content', '@type: added %title.', $watchdog_args, WATCHDOG_NOTICE, $node_link);
+        drupal_set_message(t('@type %title has benn created.', $t_args));
+        //Solo si tiene rol de superusuario se carga el grupo al historial de la persona
+        //Los grupos que crean los de rol usuario no van al historial
+        if (in_array('super usuario', array_values($user->roles)))
+            _cargar_historial($node_id,$nombre_grupo,$tipo_grupo,$miembros_grupo);
+        if ($grupo_destinatario == "si")
+            _cargar_a_tabla_destinatarios($node_id,$nombre_grupo,"group");
+    }
+    else {
+        watchdog('content', '@type: updated %title.', $watchdog_args, WATCHDOG_NOTICE, $node_link);
+        drupal_set_message(t('@type %title has been updated.', $t_args));
+        //Solo si tiene rol de superusuario se actualiza el grupo al historial de la persona
+        if (in_array('super usuario', array_values($user->roles)))
+            _actualizar_historial($node_id,$nombre_grupo,$tipo_grupo,$miembros_grupo);
+        if ($grupo_destinatario == "si")
+            _actualizar_tabla_destinatarios($node_id,$nombre_grupo);
+    }
+    if ($node->nid) {
+        unset($form_state['rebuild']);
+        $form_state['nid'] = $node->nid;
+        $form_state['redirect'] = 'node/'. $node->nid;
+    }
+    else {
+        // In the unlikely case something went wrong on save, the node will be
+        // rebuilt and node form redisplayed the same way as in prevalue.
+        drupal_set_message(t('The post could not be saved.'), 'error');
+    }    
+}
+
+function _actualizar_historial($id_grupo, $nombre_grupo, $tipo_grupo_nid, $miembros) {
+    $anho=date("Y");
+    $query='delete from personal_history where group_id=' . $id_grupo . ' and year=' . $anho;
+    $result = db_query($query);    
+    _cargar_historial($id_grupo, $nombre_grupo, $tipo_grupo_nid, $miembros);
+}
+
+function _cargar_historial($id_grupo, $nombre_grupo, $tipo_grupo_nid, $miembros) {
+    $anho=date("Y");    
+    $result = db_query('select field_nombre_categoria_grupo_value from content_type_group_categories where nid=' . $tipo_grupo_nid);
+    $tipo_grupo = db_fetch_object($result);
+    $nombre_tipo_grupo = $tipo_grupo->field_nombre_categoria_grupo_value;
+    foreach($miembros as $miembro) {       
+        $query='insert into personal_history (person_id,group_id,group_name,group_type,year) values (' . $miembro['nid'] . ', ' . $id_grupo . ', \'' . $nombre_grupo . '\', \'' . $nombre_tipo_grupo . '\', ' . $anho . ')';
+        $result = db_query($query);
+        if (db_affected_rows($result) <= 0) {        
+            drupal_set_message(t('A problem ocurred when try to save the personal history.'), 'error');    
+        }    
+    }        
+}
+
+function _borrar_historial_persona($id_persona) {
+    $query='delete from personal_history where person_id=' . $id_persona;
+    $result = db_query($query);    
+}
+
+function helper_retreat_node_form_submit($form, &$form_state) {
+    global $user;
+
+    $node = node_form_submit_build_node($form, $form_state);
+    $insert = empty($node->nid);
+    node_save($node);
+    $node_link = l(t('value'), 'node/'. $node->nid);
+    $watchdog_args = array('@type' => $node->type, '%title' => $node->title);
+    $t_args = array('@type' => node_get_types('name', $node), '%title' => $node->title);
+
+    $node_id = $node->nid;
+    $nombre_retiro = $form_state['values']['field_denominacion_retiro']['0']['value'];
+    $miembros_plantel = $form_state['values']['field_plantel_retiro'];
+    $miembros_plantel_cocina = $form_state['values']['field_miembros_plantel_cocina_re'];
+    $coordinador_retiro = $form_state['values']['field_coordinador_retiro'];
+    $coordinadores_cocina = $form_state['values']['field_coordinadores_cocina_ret'];
+    if ($insert) {
+        watchdog('content', '@type: added %title.', $watchdog_args, WATCHDOG_NOTICE, $node_link);
+        drupal_set_message(t('@type %title has benn created.', $t_args));
+        _cargar_historial_retiro($node_id,$nombre_retiro,$miembros_plantel, $miembros_plantel_cocina, $coordinador_retiro, $coordinadores_cocina);       
+    }
+    else {
+        watchdog('content', '@type: updated %title.', $watchdog_args, WATCHDOG_NOTICE, $node_link);
+        drupal_set_message(t('@type %title has been updated.', $t_args));
+        _actualizar_historial_retiro($node_id,$nombre_retiro,$miembros_plantel, $miembros_plantel_cocina, $coordinador_retiro, $coordinadores_cocina);        
+    }
+    if ($node->nid) {
+        unset($form_state['rebuild']);
+        $form_state['nid'] = $node->nid;
+        $form_state['redirect'] = 'node/'. $node->nid;
+    }
+    else {
+        // In the unlikely case something went wrong on save, the node will be
+        // rebuilt and node form redisplayed the same way as in prevalue.
+        drupal_set_message(t('The post could not be saved.'), 'error');
+    }    
+}
+
+function _actualizar_historial_retiro($id_retiro, $nombre_retiro, $miembros_plantel, $miembros_plantel_cocina, $coordinador_retiro, $coordinadores_cocina) {
+    $anho=date("Y");
+    $query='delete from personal_history where group_id=' . $id_retiro . ' and year=' . $anho;
+    $result = db_query($query);    
+    _cargar_historial_retiro($id_retiro, $nombre_retiro, $miembros_plantel, $miembros_plantel_cocina, $coordinador_retiro, $coordinadores_cocina);
+}
+
+function _cargar_historial_retiro($id_retiro, $nombre_retiro, $miembros_plantel, $miembros_plantel_cocina, $coordinador_retiro, $coordinadores_cocina) {
+    $anho=date("Y");
+    foreach($coordinador_retiro as $coordinador) {       
+        $query='insert into personal_history (person_id,group_id,group_name,group_type,year) values (' . $coordinador['nid'] . ', ' . $id_retiro . ', \'' . $nombre_retiro . ' (Coordinador)\', \'Retiro\', ' . $anho . ')';
+        $result = db_query($query);
+        if (db_affected_rows($result) <= 0) {        
+            drupal_set_message(t('A problem ocurred when try to save the personal history.'), 'error');    
+        }    
+    }
+    foreach($miembros_plantel as $miembro) {       
+        $query='insert into personal_history (person_id,group_id,group_name,group_type,year) values (' . $miembro['nid'] . ', ' . $id_retiro . ', \'' . $nombre_retiro . '\', \'Retiro\', ' . $anho . ')';
+        $result = db_query($query);
+        if (db_affected_rows($result) <= 0) {        
+            drupal_set_message(t('A problem ocurred when try to save the personal history.'), 'error');    
+        }    
+    }
+    foreach($coordinadores_cocina as $coordinador) {       
+        $query='insert into personal_history (person_id,group_id,group_name,group_type,year) values (' . $coordinador['nid'] . ', ' . $id_retiro . ', \'' . $nombre_retiro . ' (Coordinador)\', \'Retiro Cocina\', ' . $anho . ')';
+        $result = db_query($query);
+        if (db_affected_rows($result) <= 0) {        
+            drupal_set_message(t('A problem ocurred when try to save the personal history.'), 'error');    
+        }    
+    }
+    foreach($miembros_plantel_cocina as $miembro) {       
+        $query='insert into personal_history (person_id,group_id,group_name,group_type,year) values (' . $miembro['nid'] . ', ' . $id_retiro . ', \'' . $nombre_retiro . '\', \'Retiro Cocina\', ' . $anho . ')';
+        $result = db_query($query);
+        if (db_affected_rows($result) <= 0) {        
+            drupal_set_message(t('A problem ocurred when try to save the personal history.'), 'error');    
+        }    
+    }        
+}
+
+function _cargar_a_tabla_destinatarios($id_registro,$nombre_registro,$tipo_registro) {
+    $query='insert into recipients (`name`, `type`, `register_id`) values (\''. $nombre_registro  . '\', \'' . $tipo_registro . '\', ' . $id_registro . ')';
+    $result = db_query($query);
+    if (db_affected_rows($result) <= 0) {        
+        drupal_set_message(t('A problem ocurred when try to save the group into recipients table.'), 'error');    
+    }
+}
+
+function _actualizar_tabla_destinatarios($id_registro,$nombre_registro) {        
+    $query='update recipients set name=\'' . $nombre_registro . '\' where register_id=' . $id_registro;
+    $result = db_query($query);    
+}
+
+function _borrar_de_tabla_destinatarios($id_registro,$tipo_registro) {
+    $query='delete from recipients where `type`=\'' . $tipo_registro .'\' and register_id=' . $id_registro;
+    $result = db_query($query);
+    if (db_affected_rows($result) <= 0) {     
+        drupal_set_message(t('A problem ocurred when try to delete the group from recipients table.'), 'error');    
+    }
+}
+
+/**
+ * Overridden version of node_form_submit().
+ */
+function helper_sms_node_form_submit($form, &$form_state) {    
+    global $user;
+
+    $node = node_form_submit_build_node($form, $form_state);
+    node_save($node);    
+
+    //drupal_set_message('Destinatarios ' . $form_state['values']['field_destinatarios_sms']);
+
+    if ($node->nid) {
+        unset($form_state['rebuild']);
+        $form_state['nid'] = $node->nid;
+        $form_state['redirect'] = 'node/'. $node->nid;
+    }
+    else {
+        // In the unlikely case something went wrong on save, the node will be
+        // rebuilt and node form redisplayed the same way as in prevalue.
+        drupal_set_message(t('The post could not be saved.'), 'error');
+    }
+    
+    $can_mensajes = _enviar_sms($form_state['values']['field_destinatarios_sms'],$form_state['values']['field_cuerpo_sms']['0']['value']);
+    $tiempo_envio = _tiempo_para_enviar_sms($can_mensajes);
+    $message = t('Se creó correctamente su SMS.<br>');
+    if ($can_mensajes > 1)
+    	$message .= t('En breve se procedera al envio del mensaje a los ' . $can_mensajes . ' destinatarios.<br>');
+    else
+    	$message .= t('En breve se procedera al envio del mensaje a ' . $can_mensajes . ' destinatario.<br>');
+    $message .= t('Se estima que el proceso de envío de todos los mensajes será de aproximadamente: <b>' . $tiempo_envio . '</b>.<br>');
+    $message .= t('<i>Se le comunicará la finalización de este proceso por medio de un correo electrónico.</i>');
+    drupal_set_message($message);
+}
+
+function _convertir_minutos_horas($minutos)
+{
+    if ($minutos < 0)
+    {
+        $min = Abs($minutos);
+    }
+    else
+    {
+        $min = $minutos;
+    }
+    $iHours = Floor($min / 60);
+    $minutos = ($min - ($iHours * 60)) / 100;
+    $tHours = $iHours + $minutos;
+    if ($minutos < 0)
+    {
+        $tHours = $tHours * (-1);
+    }
+    $aHours = explode(".", $tHours);
+    $iHours = $aHours[0];
+    if (empty($aHours[1]))
+    {
+        $aHours[1] = "00";
+    }
+    $minutos = $aHours[1];
+    if (strlen($minutos) < 2)
+    {
+        $minutos = $minutos ."0";
+    }
+    $tHours = $iHours ." horas ". $minutos . " minutos";
+    return $tHours;
+}
+
+function _tiempo_para_enviar_sms($can_mensajes) {
+    $min = ($can_mensajes*60)/120;
+    if ($min > 60)
+        return _convertir_minutos_horas($min);
+    else
+    	if ($min >= 0 and $min <= 10)
+    		return '5 minutos';
+    	else
+        	return Floor($min) . ' minutos';
+}
+
+function _inicializar_configuraciones_busqueda() {
+    $result = db_query('select field_valor_configuracion_value from content_type_configuration where field_nombre_configuracion_value = \'limite_busqueda\'');
+    $pre_limite = db_fetch_object($result);
+    $limite_busqueda = $pre_limite->field_valor_configuracion_value;
+    $result = db_query('select * from content_type_person');
+    $can_personas = db_affected_rows($result);
+    $configuraciones = array();
+    $configuraciones['paso'] = 0;
+    if ($can_personas >= $limite_busqueda) 
+        $configuraciones['limite_busqueda'] = $limite_busqueda;
+    else
+        $configuraciones['limite_busqueda'] = $can_personas;
+
+    return $configuraciones;
+}
+
+/*Obtengo el nombre de la operadora de celular
+por el prefijo (098 => tigo, 097 => personal, etc.)*/
+function _nombre_empresa($numero) {
+    $prefijo = substr($numero,0,3);
+    $query='select field_clave_configuracion_value from content_type_configuration where field_nombre_configuracion_value = \'operadora_celular\' and field_valor_configuracion_value = \'' . $prefijo . '\'';
+    $result = db_query($query);
+    $reg_operadora = db_fetch_object($result);
+    $operadora = $reg_operadora-> field_clave_configuracion_value;
+
+    return $operadora;
+}
+
+/*Verifico que el numero a enviar no sea ni de claro ni de vox
+porque a estas empresas no se pueden enviar*/
+function _es_empresa_valida($numero) {
+    $prefijo = substr($numero,0,2); 
+    if ($prefijo == "099" or $prefijo == "096") {
+      return false;
+    }
+    else {
+      return true;
+    }
+}
+
+/*Preparo la direccion con el formato valido para enviarlo
+por mail (5959YZXXXXXX@nombre_empresa.com.py)*/
+function _preparar_direccion_a_enviar($numero) {
+    $empresa_celular = _nombre_empresa($numero);
+    $nro = str_replace("-","",$numero);
+    $nro = substr($nro,1,strlen($nro));
+    $direccion = '595' . $nro . '@' . $empresa_celular . '.com.py';
+
+    return $direccion;
+}
+
+/*Realizo la consulta sobre la base de datos dependiendo de para
+quienes va dirigido el mensaje*/
+function _realizar_consulta($destinatario, $paso, $limite) {
+    switch ($destinatario->type) {
+        case "person_categories":
+            $query='select field_celular_persona_value from content_type_person where person_category_id=' . $destinatario->register_id . ' and field_celular_persona_value is not null and field_recibir_avisos_persona_value=1 limit ' . $paso . ' , ' . $limite;
+            break;
+        case "group":
+            $query = 'select field_celular_persona_value from content_type_person join personal_history on content_type_person.nid = personal_history.person_id and personal_history.year=' . date("Y") . ' and personal_history.group_id=' . $destinatario->register_id . ' where content_type_person.field_celular_persona_value is not null and content_type_person.field_recibir_avisos_persona_value=1 limit ' . $paso . ' , ' . $limite;
+            break;
+        default:
+            $query='select field_celular_persona_value from content_type_person where field_celular_persona_value is not null and field_recibir_avisos_persona_value=1 limit ' . $paso . ' , ' . $limite;
+            break;
+    }
+    $result = db_query($query);
+
+    return $result;
+}
+
+function _enviar_sms($grupos,$mensaje) {
+    global $user;
+    $configuraciones_busqueda = _inicializar_configuraciones_busqueda();
+    $paso = $configuraciones_busqueda['paso'];
+    $limite = $configuraciones_busqueda['limite_busqueda'];
+    $can_mensajes = 0;
+    foreach($grupos as $grupo) {
+        //drupal_set_message('El mensaje se enviara al destinatario id: ' . $grupo['value']);
+        $query='select type, register_id from recipients where id = ' . $grupo['value'];
+        $result = db_query($query);
+        $destinatario = db_fetch_object($result);
+        $consulta = _realizar_consulta($destinatario,$paso,$limite);
+        while (db_affected_rows($consulta) > 0) {
+            //drupal_set_message('Encontre destinatario');
+            while ($reg = db_fetch_object($consulta)) {
+                $celular = $reg->field_celular_persona_value;
+                if (_es_empresa_valida($celular)) {
+                    $direccion_destinatario = _preparar_direccion_a_enviar($celular);                    
+                    drupal_mail('envio_sms', 'sms', $direccion_destinatario, language_default(), _remove_accent($mensaje), 'info@movimientoperegrino.org');        
+                    $can_mensajes += 1;
+                }
+            }
+            $paso = $paso + $limite;
+            $consulta = _realizar_consulta($destinatario,$paso,$limite);   
+        }
+    }
+    drupal_mail('envio_sms', 'confirmacion_envio', $user->mail, language_default(), '', 'info@movimientoperegrino.org');
+    return $can_mensajes;
+}
+
+function _remove_accent($str) {
+	$search = explode(",","ç,æ,œ,á,é,í,ó,ú,à,è,ì,ò,ù,ä,ë,ï,ö,ü,ÿ,â,ê,î,ô,û,å,e,i,ø,u");
+	$replace = explode(",","c,ae,oe,a,e,i,o,u,a,e,i,o,u,a,e,i,o,u,y,a,e,i,o,u,a,e,i,o,u");
+	$new_str = str_replace($search, $replace, $str);
+	
+	return $new_str;
+}
+
+// construct email
+function envio_sms_mail($key, &$message, $params) {
+    if ($key == 'confirmacion_envio') {
+    	$headers = array(
+        	'MIME-Version' => '1.0',
+        	'Content-Type' => 'text/html; charset=UTF-8; format=flowed',
+        	'Content-Transfer-Encoding' => '8Bit',
+        	'X-Mailer' => 'Drupal'
+    	);
+    	foreach ($headers as $k => $v) {
+        	$message['headers'][$k] = $v;
+    	}
+    }
+    switch($key) {
+    	case ('confirmacion_envio'):
+    		$message['subject'] = "Confimacion envio de SMS";
+    		$message['body'] = "Se realizo con exito el envio de mensajes que solicito al sistema del Movimiento Peregrino.-";
+    		break;
+    	case ('sms'):
+    		$message['subject'] = "";
+    		$message['body'] = $params;
+    		break;
+    	default:
+    		break;
+    }
+}
+
+/** 
+* Implementation of hook_menu(). 
+*/ 
+function helper_menu() {
+    $items['node/%exportar/exportar'] = array(
+	    'title' => 'Exportar',
+	    'type' => MENU_LOCAL_TASK,
+	    'weight' => 10,
+	    'page callback' => 'drupal_get_form',
+        'page arguments' => array('exportar_peregrinos_tab'),
+        'access callback' => user_access('administer site configuration'),
+        'access arguments' => array(1),
+    );
+
+    $items['node/%importar/importar'] = array(               
+        'type' => MENU_LOCAL_TASK,
+        'title' => 'Importar',
+        'weight' => 11,
+        'access callback' => 'user_access',
+        'access arguments' => array('import content'),
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array('helper_import_add_form'),
+        'file' => 'helper.import.inc',
+    );
+
+   return $items;
+} 
+
+function exportar_load($nid) {
+	if (is_numeric($nid)) {
+		$node = node_load($nid);
+        if ($node->type == 'page' and ($node->title == 'Grupos' 
+            or $node->title == 'SMS' or $node->title == 'Retiros' or
+            $node->title == 'Personas')) {
+            return $node;
+        }
+    }
+	return FALSE;
+}
+
+function importar_load($nid) {
+	if (is_numeric($nid)) {
+		$node = node_load($nid);
+        if ($node->type == 'page' and $node->title == 'Personas') {
+            return $node;
+        }
+    }
+	return FALSE;
+}
+
+/** 
+* Define the settings form. 
+*/ 
+function exportar_peregrinos_tab() { 
+    $form['export_types'] = array( 
+        '#type' => 'radios', 
+        '#description' => t('Elija el formato en el que desea exportar.'), 
+        '#title' => t('Formato a exportar'),
+        '#options' => array(
+            'XLS (Microsoft Excel)',
+            'CSV (Valores separados por coma)',
+            'DOC (Microsoft Word)',
+            'TXT (Texto Plano)',
+         ),
+        '#default_value' => 0,
+    );
+     
+    $form['submit'] = array(
+        '#type' => 'submit',
+        '#value' => t('Export'),
+    ); 
+
+    return $form; 
+} 
+
+function exportar_peregrinos_tab_submit($form, &$form_state) {
+    $filtros = urldecode($_SESSION['url_exportar']);
+    $export_type = $form_state['values']['export_types'];
+    switch($export_type) {
+        case 0:
+            $url_export = $_SESSION['url_exportar_xls'];
+            break;
+        case 1:
+            $url_export = $_SESSION['url_exportar_csv'];
+            break;
+        case 2:
+            $url_export = $_SESSION['url_exportar_doc'];
+            break;
+        case 3:
+            $url_export = $_SESSION['url_exportar_txt'];
+            break;
+    }
+    if ($filtros == "sin_filtro") {
+        drupal_goto($url_export);
+    }
+    else {
+        drupal_goto($url_export, $filtros);
+    }    
+}
+
+
+
+function helper_form_values_exposed_form_alter (&$form, $form_state) {
+	foreach($form as $key => &$value) {
+		if(isset($value['#options']['All'])) {
+			$value['#options']['All'] = t('All');
+		}
+	}
+}
+
+function helper_node_import_values_alter(&$values,$type,$defaults,$options,$fields,$preview) {
+    /* Cargo el node id de la categoria peregrino, asumiendo que todos las personas 
+    ** que crean mediante el modulo node import, se crearan con la categoria peregrino */
+    $values['field_categoria_persona'] = array(0 => array('nid' => '2392'));
+}
+
+function helper_user ( $op ){
+    if ( $op == "login" ){
+        $_REQUEST['destination'] = 'content/bienvenido';
+    }
+}

@@ -1,0 +1,7 @@
+#251027 by InternetPro: Fixed issue with missing where clause that resulted in all mails being marked sent without actually having sent them
+- Added debug messages for mailq actions
+- Reformatted sql queries
+- Fixed display of timestamps where value was 0, reformatted sqls
+#229812 ff1, InternetPro: Fixed issue with mails not being sent when cron invoked from admin/logs/status/run-cron
+#229801 by ff1: Fixed issue with batch size not being respected by cron
+- Made changes as recommended by coder

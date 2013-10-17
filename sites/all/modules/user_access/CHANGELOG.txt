@@ -1,0 +1,6 @@
+// $Id$
+
+User Access 6.x-1.0, 2010-09-24
+-------------------------------
+by bilibul: first release
+

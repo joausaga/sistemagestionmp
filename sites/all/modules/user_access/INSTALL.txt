@@ -1,0 +1,19 @@
+//* $Id
+
+-- REQUIREMENTS --
+
+None
+
+-- PRE-REQUISITES --
+
+None
+
+-- INSTALLATION --
+
+* Place the entire user_access directory into a modules directory of your
+  choice, in most cases: sites/all/modules.
+
+* Enable the User Access module by navigating to:
+
+  Administer > Site building > Modules
+

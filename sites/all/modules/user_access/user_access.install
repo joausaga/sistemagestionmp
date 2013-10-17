@@ -1,0 +1,63 @@
+<?php
+// $Id$
+
+/**
+ * Implementation of hook_schema().
+ */
+function user_access_schema() {
+  $schema['node_user_access'] = array(
+    'description' => 'Stores node views information.',
+    'fields' => array(
+      'aid' => array(
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'description' => 'Primary Key: Unique node view ID.',
+      ),
+      'nid' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => 'The {node}.nid of the node viewed.',
+      ),
+      'uid' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => 'The {users}.uid of the user who viewed the node.',
+      ),
+      'timestamp' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => 'The timestamp the user viewed the node.',
+      ),
+    ),
+    'primary key' => array('aid'),
+    'indexes' => array(
+      'accesslog_node_timestamp' => array('timestamp'),
+      'accesslog_node_uid' => array('uid'),
+      'accesslog_node_nid' => array('nid'),
+    ),
+  );
+
+  return $schema;
+}
+
+/**
+ * Implementation of hook_install()
+ */
+function user_access_install() {
+  drupal_install_schema('node_user_access');
+}
+
+/**
+ * Implementation of hook_uninstall()
+ */
+function user_access__uninstall() {
+  drupal_uninstall_schema('node_user_access');
+}
+

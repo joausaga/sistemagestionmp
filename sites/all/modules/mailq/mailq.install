@@ -1,0 +1,202 @@
+<?php
+
+/**
+ * @file
+ * The MailQ Install File
+ */
+
+function mailq_install() {
+  drupal_install_schema('mailq');
+}
+
+function mailq_schema() {
+  $schema['mailq_active_queue'] = array(
+    'description' => 'Active Queue of Mails that has yet to be send out',
+    'fields' => array(
+      'mailq_id' => array(
+        'description' => 'The primary identifier for queued mails',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE),
+      'mailkey' => array(
+        'description' => 'Unique key identifying the mail',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => ''),
+      'header' => array(
+        'description' => 'Mail Header',
+        'type' => 'text',
+        'default' => ''),
+      'sender' => array(
+        'description' => 'Sender Email ID',
+        'type' => 'varchar',
+        'length' => 255,
+        'default' => ''),
+      'recpt' => array(
+        'description' => 'Reciepient Mail ID',
+        'type' => 'text',
+        'default' => ''),
+      'subject' => array(
+        'description' => 'Subject of Email',
+        'type' => 'text',
+        'default' => ''),
+      'body' => array(
+        'description' => 'Body of Email',
+        'type' => 'text',
+        'default' => ''),
+      'queue_date' => array(
+        'description' => 'UNIX Timestamp when the mail was queued',
+        'type' => 'int',
+        'default' => 0),
+      'queue_send' => array(
+        'description' => 'UNIX Timestamp when the mail was send',
+        'type' => 'int',
+        'default' => 0),
+      'queue_sent' => array(
+        'description' => 'UNIX Timestamp when the mail was sent',
+        'type' => 'int',
+        'default' => 0),
+      'queue_attempts' => array(
+        'description' => 'Number of attempts made to send the mail',
+        'type' => 'int',
+        'default' => 0),
+      'queue_engine_used' => array(
+        'description' => 'Queuing Engine used',
+        'type' => 'text',
+        'default' => ''),
+      'queue_priority' => array(
+        'description' => 'Number of attempts made to send the mail',
+        'type' => 'int',
+        'default' => 0),
+      'queue_status' => array(
+        'description' => 'Number of attempts made to send the mail',
+        'type' => 'int',
+        'default' => 0),
+      ),
+    'primary key' => array('mailq_id'),
+  );
+
+  $schema['mailq_archive'] = array(
+    'description' => 'Archive of Queue of Mails',
+    'fields' => array(
+      'mailq_id' => array(
+        'description' => 'The primary identifies for queued mails',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE),
+      'mailkey' => array(
+        'description' => 'Unique key identifying the mail',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => ''),
+      'header' => array(
+        'description' => 'Mail Header',
+        'type' => 'text',
+        'default' => ''),
+      'sender' => array(
+        'description' => 'Sender Email ID',
+        'type' => 'varchar',
+        'length' => 255,
+        'default' => ''),
+      'recpt' => array(
+        'description' => 'Reciepient Mail ID',
+        'type' => 'text',
+        'default' => ''),
+      'subject' => array(
+        'description' => 'Subject of Email',
+        'type' => 'text',
+        'default' => ''),
+      'body' => array(
+        'description' => 'Body of Email',
+        'type' => 'text',
+        'default' => ''),
+      'queue_date' => array(
+        'description' => 'UNIX Timestamp when the mail was queued',
+        'type' => 'int',
+        'default' => 0),
+      'queue_send' => array(
+        'description' => 'UNIX Timestamp when the mail was send',
+        'type' => 'int',
+        'default' => 0),
+      'queue_sent' => array(
+        'description' => 'UNIX Timestamp when the mail was sent',
+        'type' => 'int',
+        'default' => 0),
+      'queue_attempts' => array(
+        'description' => 'Number of attempts made to send the mail',
+        'type' => 'int',
+        'default' => 0),
+      'queue_engine_used' => array(
+        'description' => 'Queuing Engine used',
+        'type' => 'text',
+        'default' => ''),
+      'queue_priority' => array(
+        'description' => 'Number of attempts made to send the mail',
+        'type' => 'int',
+        'default' => 0),
+      'queue_status' => array(
+        'description' => 'Number of attempts made to send the mail',
+        'type' => 'int',
+        'default' => 0),
+      'archive_stamp' => array(
+        'description' => 'Number of attempts made to send the mail',
+        'type' => 'int',
+        'default' => 0),
+      ),
+    'primary key' => array('mailq_id'),
+  );
+
+  $schema['mailq_logs'] = array(
+    'description' => 'Log of MailQ',
+    'fields' => array(
+      'mailq_log_id' => array(
+        'description' => 'The primary identifies for MailQ Log',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE),
+      'mailq_id' => array(
+        'description' => 'The reference mailq ID',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0),
+      'mailq_log_date' => array(
+        'description' => 'Log entry Date',
+        'type' => 'int',
+        'default' => 0),
+      'mailq_log_msg' => array(
+        'description' => 'Log Message',
+        'type' => 'text',
+        'default' => ''),
+      'mailq_log_status_code' => array(
+        'description' => 'Log Message Status Code',
+        'type' => 'int',
+        'default' => 0),
+      ),
+    'primary key' => array('mailq_log_id'),
+  );
+
+  return $schema;
+}
+function mailq_uninstall() {
+  drupal_uninstall_schema('mailq');
+  return;
+}
+
+
+function mailq_enable() {
+
+}
+
+/**
+ * We just need to remove outselves as the smtp_library
+ */
+function mailq_disable() {
+  $path = drupal_get_path('module', 'mailq');
+  if (variable_get('smtp_library', 0) == $path ) {
+    variable_del('smtp_library');
+  }
+  return;
+}
+
